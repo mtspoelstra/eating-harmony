@@ -1,0 +1,204 @@
+import { Link, Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { SymbolView } from "expo-symbols";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+
+import { RecipeThumbnail } from "@/components/ui/RecipeThumbnail";
+import { ReactionBadge } from "@/components/ui/ReactionBadge";
+import { useDeleteCookLogMutation } from "@/hooks/useCookLogs";
+import { useDeleteRecipeMutation, useRecipeQuery } from "@/hooks/useRecipes";
+import { formatDate, isCurrentDiet, timesCooked } from "@/lib/recipeStats";
+
+export default function RecipeDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const { data: recipe, isLoading } = useRecipeQuery(id);
+  const deleteRecipe = useDeleteRecipeMutation();
+  const deleteCookLog = useDeleteCookLogMutation(id);
+
+  if (isLoading || !recipe) {
+    return <View className="flex-1 bg-cream-50" />;
+  }
+
+  const inDiet = isCurrentDiet(recipe);
+  const missing = recipe.ingredients.filter((f) => !f.is_current);
+
+  const onDelete = () => {
+    Alert.alert("Delete recipe?", `"${recipe.name}" will be permanently removed.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          await deleteRecipe.mutateAsync(recipe.id);
+          router.back();
+        },
+      },
+    ]);
+  };
+
+  return (
+    <>
+      <Stack.Screen
+        options={{
+          title: "",
+          headerRight: () => (
+            <View className="flex-row gap-4">
+              <Link href={`/recipe/${recipe.id}/edit`} asChild>
+                <Pressable hitSlop={8}>
+                  <SymbolView
+                    name={{ ios: "pencil", android: "edit", web: "edit" }}
+                    tintColor="#332F28"
+                    size={20}
+                  />
+                </Pressable>
+              </Link>
+              <Pressable onPress={onDelete} hitSlop={8}>
+                <SymbolView
+                  name={{ ios: "trash", android: "delete", web: "delete" }}
+                  tintColor="#BC5A2C"
+                  size={20}
+                />
+              </Pressable>
+            </View>
+          ),
+        }}
+      />
+      <ScrollView className="flex-1 bg-cream-50" showsVerticalScrollIndicator={false}>
+        <RecipeThumbnail uri={recipe.photo_url} className="h-56 w-full" />
+
+        <View className="px-5 pt-4">
+          <Text className="mb-1 text-2xl font-bold text-ink-900">{recipe.name}</Text>
+
+          {recipe.tags.length > 0 && (
+            <Text className="mb-2 text-sm text-ink-400">
+              {recipe.tags.map((t) => t.name).join(" · ")}
+            </Text>
+          )}
+
+          <View
+            className={`mb-4 self-start rounded-pill px-3 py-1 ${
+              inDiet ? "bg-sage-100" : "bg-cream-300"
+            }`}
+          >
+            <Text className={`text-xs font-semibold ${inDiet ? "text-sage-700" : "text-terracotta-600"}`}>
+              {inDiet ? "On your current diet" : "Not currently matching your foods"}
+            </Text>
+          </View>
+
+          {!inDiet && missing.length > 0 && (
+            <Text className="mb-4 text-xs leading-4 text-ink-400">
+              Needs: {missing.map((f) => f.name).join(", ")} — add {missing.length > 1 ? "these" : "this"}{" "}
+              to My Foods to unlock it.
+            </Text>
+          )}
+
+          <Section title="Ingredients">
+            <View className="gap-2">
+              {recipe.ingredients.map((food) => (
+                <View key={food.id} className="flex-row items-center gap-2.5">
+                  <View
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      food.is_current ? "bg-sage-500" : "bg-ink-100"
+                    }`}
+                  />
+                  <Text className="text-base text-ink-800">{food.name}</Text>
+                </View>
+              ))}
+            </View>
+          </Section>
+
+          {recipe.steps.length > 0 && (
+            <Section title="Steps">
+              <View className="gap-3">
+                {recipe.steps.map((step, i) => (
+                  <View key={i} className="flex-row gap-3">
+                    <Text className="w-6 text-base font-semibold text-terracotta-400">{i + 1}</Text>
+                    <Text className="flex-1 text-base leading-5 text-ink-800">{step}</Text>
+                  </View>
+                ))}
+              </View>
+            </Section>
+          )}
+
+          {recipe.notes && (
+            <Section title="Notes">
+              <Text className="text-base leading-5 text-ink-600">{recipe.notes}</Text>
+            </Section>
+          )}
+
+          <Section
+            title={`Cook history${timesCooked(recipe) ? ` · ${timesCooked(recipe)}×` : ""}`}
+            action={
+              <Link href={`/recipe/${recipe.id}/log`} asChild>
+                <Pressable className="flex-row items-center gap-1 rounded-pill bg-sage-100 px-3 py-1.5 active:bg-sage-200">
+                  <SymbolView
+                    name={{ ios: "plus", android: "add", web: "add" }}
+                    tintColor="#5A7A4B"
+                    size={13}
+                  />
+                  <Text className="text-xs font-semibold text-sage-700">Log a cook</Text>
+                </Pressable>
+              </Link>
+            }
+          >
+            {recipe.cook_logs.length === 0 ? (
+              <Text className="text-sm text-ink-400">
+                Not cooked yet — log it after your first time making this.
+              </Text>
+            ) : (
+              <View className="gap-2.5">
+                {recipe.cook_logs.map((log) => (
+                  <View
+                    key={log.id}
+                    className="flex-row items-center justify-between rounded-2xl bg-white p-3.5"
+                  >
+                    <View className="flex-1 pr-2">
+                      <Text className="mb-1 text-sm font-medium text-ink-800">
+                        {formatDate(log.cooked_on)}
+                      </Text>
+                      <ReactionBadge reaction={log.reaction} />
+                      {log.notes && (
+                        <Text className="mt-1.5 text-xs leading-4 text-ink-400">{log.notes}</Text>
+                      )}
+                    </View>
+                    <Pressable
+                      onPress={() => deleteCookLog.mutate(log.id)}
+                      hitSlop={8}
+                      className="p-1"
+                    >
+                      <SymbolView
+                        name={{ ios: "xmark", android: "close", web: "close" }}
+                        tintColor="#8A8477"
+                        size={15}
+                      />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
+          </Section>
+        </View>
+      </ScrollView>
+    </>
+  );
+}
+
+function Section({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <View className="mb-6">
+      <View className="mb-2.5 flex-row items-center justify-between">
+        <Text className="text-sm font-bold uppercase tracking-wide text-ink-400">{title}</Text>
+        {action}
+      </View>
+      {children}
+    </View>
+  );
+}
