@@ -1,8 +1,12 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { addCookLog, deleteCookLog } from "@/lib/api";
+import { addCookLog, deleteCookLog, fetchAllCookLogs } from "@/lib/api";
 import { useAuth } from "@/lib/AuthProvider";
 import { Reaction } from "@/lib/types";
+
+export function useAllCookLogsQuery() {
+  return useQuery({ queryKey: ["cookLogs"], queryFn: fetchAllCookLogs });
+}
 
 export function useAddCookLogMutation(recipeId: string) {
   const queryClient = useQueryClient();
@@ -13,6 +17,7 @@ export function useAddCookLogMutation(recipeId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recipe", recipeId] });
       queryClient.invalidateQueries({ queryKey: ["recipes"] });
+      queryClient.invalidateQueries({ queryKey: ["cookLogs"] });
     },
   });
 }
@@ -24,6 +29,7 @@ export function useDeleteCookLogMutation(recipeId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recipe", recipeId] });
       queryClient.invalidateQueries({ queryKey: ["recipes"] });
+      queryClient.invalidateQueries({ queryKey: ["cookLogs"] });
     },
   });
 }

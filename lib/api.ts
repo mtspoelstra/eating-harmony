@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { CookLog, Food, Reaction, RecipeWithDetails, Tag } from "@/lib/types";
+import type { CookLog, CookLogWithRecipe, Food, Reaction, RecipeWithDetails, Tag } from "@/lib/types";
 
 // ---------- foods ----------
 
@@ -42,10 +42,10 @@ export async function addOrRestoreFood(userId: string, name: string): Promise<Fo
   return data;
 }
 
-export async function removeFoodFromCurrent(foodId: string): Promise<void> {
+export async function setFoodCurrent(foodId: string, isCurrent: boolean): Promise<void> {
   const { error } = await supabase
     .from("foods")
-    .update({ is_current: false })
+    .update({ is_current: isCurrent })
     .eq("id", foodId);
   if (error) throw error;
 }
@@ -233,6 +233,16 @@ export async function addCookLog(
 export async function deleteCookLog(id: string): Promise<void> {
   const { error } = await supabase.from("cook_logs").delete().eq("id", id);
   if (error) throw error;
+}
+
+export async function fetchAllCookLogs(): Promise<CookLogWithRecipe[]> {
+  const { data, error } = await supabase
+    .from("cook_logs")
+    .select("*, recipe:recipes ( id, name, photo_url )")
+    .order("cooked_on", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as unknown as CookLogWithRecipe[];
 }
 
 // ---------- storage ----------

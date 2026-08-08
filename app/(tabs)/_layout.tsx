@@ -66,6 +66,20 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="log"
+        options={{
+          title: "Cook Log",
+          tabBarIcon: ({ color }) => (
+            <SymbolView
+              name="calendar"
+              fallback={null}
+              tintColor={color}
+              size={24}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

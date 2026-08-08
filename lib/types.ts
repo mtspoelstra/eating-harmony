@@ -41,3 +41,7 @@ export type RecipeWithDetails = Recipe & {
   tags: Tag[];
   cook_logs: CookLog[];
 };
+
+export type CookLogWithRecipe = CookLog & {
+  recipe: Pick<Recipe, "id" | "name" | "photo_url">;
+};

@@ -1,7 +1,6 @@
 import { Link } from "expo-router";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
-import { Card } from "@/components/ui/Card";
 import { RecipeThumbnail } from "@/components/ui/RecipeThumbnail";
 import { formatDate, isCurrentDiet, lastCookedOn, timesCooked } from "@/lib/recipeStats";
 import { RecipeWithDetails } from "@/lib/types";
@@ -13,7 +12,7 @@ export function RecipeCard({ recipe }: { recipe: RecipeWithDetails }) {
 
   return (
     <Link href={`/recipe/${recipe.id}`} asChild>
-      <Card className="mb-3 flex-row gap-3 p-3">
+      <Pressable className="mb-3 flex-row gap-3 rounded-card bg-white p-3 shadow-sm shadow-ink-900/5 active:opacity-70">
         <RecipeThumbnail uri={recipe.photo_url} className="h-20 w-20 rounded-2xl" />
         <View className="flex-1 justify-center">
           <View className="mb-1 flex-row items-center gap-2">
@@ -35,7 +34,7 @@ export function RecipeCard({ recipe }: { recipe: RecipeWithDetails }) {
               : `Cooked ${cooked}× · last ${lastCooked ? formatDate(lastCooked) : "—"}`}
           </Text>
         </View>
-      </Card>
+      </Pressable>
     </Link>
   );
 }

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { addOrRestoreFood, fetchFoods, removeFoodFromCurrent } from "@/lib/api";
+import { addOrRestoreFood, fetchFoods, setFoodCurrent } from "@/lib/api";
 import { useAuth } from "@/lib/AuthProvider";
 
 export function useFoodsQuery() {
@@ -12,14 +12,18 @@ export function useAddFoodMutation() {
   const { session } = useAuth();
   return useMutation({
     mutationFn: (name: string) => addOrRestoreFood(session!.user.id, name),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["foods"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["foods"] });
+      queryClient.invalidateQueries({ queryKey: ["recipes"] });
+    },
   });
 }
 
-export function useRemoveFoodMutation() {
+export function useSetFoodCurrentMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (foodId: string) => removeFoodFromCurrent(foodId),
+    mutationFn: ({ foodId, isCurrent }: { foodId: string; isCurrent: boolean }) =>
+      setFoodCurrent(foodId, isCurrent),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["foods"] });
       queryClient.invalidateQueries({ queryKey: ["recipes"] });
