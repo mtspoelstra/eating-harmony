@@ -1,4 +1,4 @@
-import { Link } from "expo-router";
+import { useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useMemo, useState } from "react";
 import { FlatList, Pressable, ScrollView, Text, View } from "react-native";
@@ -13,6 +13,7 @@ import { isCurrentDiet } from "@/lib/recipeStats";
 type ViewMode = "current" | "all";
 
 export default function RecipesScreen() {
+  const router = useRouter();
   const { data: recipes, isLoading } = useRecipesQuery();
   const { data: tags } = useTagsQuery();
   const [mode, setMode] = useState<ViewMode>("current");
@@ -46,11 +47,12 @@ export default function RecipesScreen() {
               onPress={() => setMode("all")}
             />
           </View>
-          <Link href="/recipe/new" asChild>
-            <Pressable className="ml-3 h-11 w-11 items-center justify-center rounded-full bg-terracotta-400 active:bg-terracotta-500">
-              <SymbolView name="plus" fallback={null} tintColor="#fff" size={22} />
-            </Pressable>
-          </Link>
+          <Pressable
+            onPress={() => router.push("/recipe/new")}
+            className="ml-3 h-11 w-11 items-center justify-center rounded-full bg-terracotta-400 active:bg-terracotta-500"
+          >
+            <SymbolView name="plus" fallback={null} tintColor="#fff" size={22} />
+          </Pressable>
         </View>
 
         {usedTags.length > 0 && (

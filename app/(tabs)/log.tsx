@@ -1,4 +1,4 @@
-import { Link } from "expo-router";
+import { useRouter } from "expo-router";
 import { useMemo } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 
@@ -22,6 +22,7 @@ function friendlyDate(iso: string): string {
 }
 
 export default function LogScreen() {
+  const router = useRouter();
   const { data: logs, isLoading } = useAllCookLogsQuery();
 
   const items = useMemo<ListItem[]>(() => {
@@ -64,22 +65,23 @@ export default function LogScreen() {
               {item.label}
             </Text>
           ) : (
-            <Link href={`/recipe/${item.log.recipe.id}`} asChild>
-              <Pressable className="mb-2.5 flex-row items-center gap-3 rounded-card bg-white p-3 shadow-sm shadow-ink-900/5 active:opacity-70">
-                <RecipeThumbnail uri={item.log.recipe.photo_url} className="h-14 w-14 rounded-2xl" />
-                <View className="flex-1">
-                  <Text className="mb-1 text-base font-semibold text-ink-800" numberOfLines={1}>
-                    {item.log.recipe.name}
+            <Pressable
+              onPress={() => router.push(`/recipe/${item.log.recipe.id}`)}
+              className="mb-2.5 flex-row items-center gap-3 rounded-card bg-white p-3 shadow-sm shadow-ink-900/5 active:opacity-70"
+            >
+              <RecipeThumbnail uri={item.log.recipe.photo_url} className="h-14 w-14 rounded-2xl" />
+              <View className="flex-1">
+                <Text className="mb-1 text-base font-semibold text-ink-800" numberOfLines={1}>
+                  {item.log.recipe.name}
+                </Text>
+                <ReactionBadge reaction={item.log.reaction} />
+                {item.log.notes && (
+                  <Text className="mt-1 text-xs leading-4 text-ink-400" numberOfLines={2}>
+                    {item.log.notes}
                   </Text>
-                  <ReactionBadge reaction={item.log.reaction} />
-                  {item.log.notes && (
-                    <Text className="mt-1 text-xs leading-4 text-ink-400" numberOfLines={2}>
-                      {item.log.notes}
-                    </Text>
-                  )}
-                </View>
-              </Pressable>
-            </Link>
+                )}
+              </View>
+            </Pressable>
           )
         }
       />

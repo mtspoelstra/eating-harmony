@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TextField } from "@/components/ui/TextField";
-import { useAddFoodMutation, useFoodsQuery, useSetFoodCurrentMutation } from "@/hooks/useFoods";
+import { useAddFoodMutation, useFoodsQuery, useUpdateFoodBucketMutation } from "@/hooks/useFoods";
 import { Food } from "@/lib/types";
 
 type ViewMode = "current" | "all";
@@ -14,13 +14,15 @@ type ViewMode = "current" | "all";
 export default function FoodsScreen() {
   const { data: foods, isLoading } = useFoodsQuery();
   const addFood = useAddFoodMutation();
-  const setCurrent = useSetFoodCurrentMutation();
+  const updateBucket = useUpdateFoodBucketMutation();
   const [name, setName] = useState("");
   const [mode, setMode] = useState<ViewMode>("current");
 
   const list = useMemo(() => {
     const sorted = [...(foods ?? [])].sort((a, b) => a.name.localeCompare(b.name));
-    return mode === "current" ? sorted.filter((f) => f.is_current) : sorted;
+    return mode === "current"
+      ? sorted.filter((f) => f.is_current)
+      : sorted.filter((f) => f.is_all_foods);
   }, [foods, mode]);
 
   const onAdd = async () => {
@@ -35,23 +37,28 @@ export default function FoodsScreen() {
     }
   };
 
-  const onRemove = (food: Food) => {
+  const onArchive = (food: Food) => {
     Alert.alert(
       `Remove ${food.name}?`,
-      "Recipes using this ingredient will move out of Current Diet, but stay in All Recipes.",
+      "It'll be tucked away completely — recipes using it will move out of Current Diet. You can always re-add it later.",
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Remove",
           style: "destructive",
-          onPress: () => setCurrent.mutate({ foodId: food.id, isCurrent: false }),
+          onPress: () =>
+            updateBucket.mutate({ foodId: food.id, is_current: false, is_all_foods: false }),
         },
       ]
     );
   };
 
-  const onRestore = (food: Food) => {
-    setCurrent.mutate({ foodId: food.id, isCurrent: true });
+  const onMove = (food: Food) => {
+    if (food.is_current) {
+      updateBucket.mutate({ foodId: food.id, is_current: false, is_all_foods: true });
+    } else {
+      updateBucket.mutate({ foodId: food.id, is_current: true, is_all_foods: false });
+    }
   };
 
   return (
@@ -87,17 +94,29 @@ export default function FoodsScreen() {
               subtitle={
                 mode === "current"
                   ? "Add the foods you're currently eating and tolerating well — recipes made entirely from this list will show up under Current Diet."
-                  : "Every food you've ever added shows up here, even ones you're not currently eating."
+                  : "Foods you've moved out of Current Foods land here, so you can quickly bring them back later."
               }
             />
           ) : null
         }
         renderItem={({ item }) => (
           <Card className="flex-row items-center justify-between py-3.5">
-            <Text className="text-base font-medium text-ink-800">{item.name}</Text>
-            {item.is_current ? (
+            <Text className="flex-1 text-base font-medium text-ink-800">{item.name}</Text>
+            <View className="flex-row items-center gap-1">
               <Pressable
-                onPress={() => onRemove(item)}
+                onPress={() => onMove(item)}
+                hitSlop={10}
+                className="rounded-full p-1.5 active:bg-sage-100"
+              >
+                <SymbolView
+                  name="arrow.left.arrow.right"
+                  fallback={null}
+                  tintColor="#5A7A4B"
+                  size={18}
+                />
+              </Pressable>
+              <Pressable
+                onPress={() => onArchive(item)}
                 hitSlop={10}
                 className="rounded-full p-1.5 active:bg-ink-100"
               >
@@ -108,20 +127,7 @@ export default function FoodsScreen() {
                   size={19}
                 />
               </Pressable>
-            ) : (
-              <Pressable
-                onPress={() => onRestore(item)}
-                hitSlop={10}
-                className="rounded-full p-1.5 active:bg-sage-100"
-              >
-                <SymbolView
-                  name="plus.circle"
-                  fallback={null}
-                  tintColor="#5A7A4B"
-                  size={20}
-                />
-              </Pressable>
-            )}
+            </View>
           </Card>
         )}
       />

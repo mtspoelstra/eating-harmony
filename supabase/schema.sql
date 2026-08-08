@@ -6,18 +6,31 @@ create extension if not exists "pgcrypto";
 
 -- ============================================================
 -- FOODS (master ingredient list, per user)
--- "is_current" = whether it's on the user's currently-tolerated list ("My Foods").
--- Recipes reference foods via recipe_ingredients, so removing a food from
--- My Foods (is_current = false) just makes recipes that use it drop out of
--- "Current Diet" -- it does not delete the food or break any recipe.
+-- A food lives in exactly one bucket at a time:
+--   is_current = true   -> shows under "Current Foods"
+--   is_all_foods = true -> shows under "All Foods" (moved out of current,
+--                          kept around for quick re-adding)
+--   both false           -> archived/hidden from both lists
+-- Recipes reference foods via recipe_ingredients, so moving a food out of
+-- Current Foods just makes recipes that use it drop out of "Current Diet"
+-- -- it does not delete the food or break any recipe.
 -- ============================================================
 create table if not exists public.foods (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   name text not null,
   is_current boolean not null default true,
+  is_all_foods boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+-- If this table already existed before is_all_foods was added, this backfills
+-- existing rows so nothing that was visible before silently disappears:
+alter table public.foods add column if not exists is_all_foods boolean;
+update public.foods set is_all_foods = true where is_current = false and is_all_foods is null;
+update public.foods set is_all_foods = false where is_all_foods is null;
+alter table public.foods alter column is_all_foods set default false;
+alter table public.foods alter column is_all_foods set not null;
 
 create unique index if not exists foods_user_name_unique
   on public.foods (user_id, lower(name));

@@ -25,7 +25,7 @@ export async function addOrRestoreFood(userId: string, name: string): Promise<Fo
     if (existing.is_current) return existing;
     const { data, error } = await supabase
       .from("foods")
-      .update({ is_current: true })
+      .update({ is_current: true, is_all_foods: false })
       .eq("id", existing.id)
       .select()
       .single();
@@ -35,18 +35,18 @@ export async function addOrRestoreFood(userId: string, name: string): Promise<Fo
 
   const { data, error } = await supabase
     .from("foods")
-    .insert({ user_id: userId, name: trimmed, is_current: true })
+    .insert({ user_id: userId, name: trimmed, is_current: true, is_all_foods: false })
     .select()
     .single();
   if (error) throw error;
   return data;
 }
 
-export async function setFoodCurrent(foodId: string, isCurrent: boolean): Promise<void> {
-  const { error } = await supabase
-    .from("foods")
-    .update({ is_current: isCurrent })
-    .eq("id", foodId);
+export async function updateFoodBucket(
+  foodId: string,
+  bucket: { is_current: boolean; is_all_foods: boolean }
+): Promise<void> {
+  const { error } = await supabase.from("foods").update(bucket).eq("id", foodId);
   if (error) throw error;
 }
 

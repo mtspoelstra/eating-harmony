@@ -5,6 +5,7 @@ export type Food = {
   user_id: string;
   name: string;
   is_current: boolean;
+  is_all_foods: boolean;
   created_at: string;
 };
 

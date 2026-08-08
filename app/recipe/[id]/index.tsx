@@ -1,4 +1,4 @@
-import { Link, Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 
@@ -43,16 +43,14 @@ export default function RecipeDetailScreen() {
           title: "",
           headerRight: () => (
             <View className="flex-row gap-4">
-              <Link href={`/recipe/${recipe.id}/edit`} asChild>
-                <Pressable hitSlop={8}>
-                  <SymbolView
-                    name="pencil"
-                    fallback={null}
-                    tintColor="#332F28"
-                    size={20}
-                  />
-                </Pressable>
-              </Link>
+              <Pressable onPress={() => router.push(`/recipe/${recipe.id}/edit`)} hitSlop={8}>
+                <SymbolView
+                  name="pencil"
+                  fallback={null}
+                  tintColor="#332F28"
+                  size={20}
+                />
+              </Pressable>
               <Pressable onPress={onDelete} hitSlop={8}>
                 <SymbolView
                   name="trash"
@@ -131,17 +129,18 @@ export default function RecipeDetailScreen() {
           <Section
             title={`Cook history${timesCooked(recipe) ? ` · ${timesCooked(recipe)}×` : ""}`}
             action={
-              <Link href={`/recipe/${recipe.id}/log`} asChild>
-                <Pressable className="flex-row items-center gap-1 rounded-pill bg-sage-100 px-3 py-1.5 active:bg-sage-200">
-                  <SymbolView
-                    name="plus"
-                    fallback={null}
-                    tintColor="#5A7A4B"
-                    size={13}
-                  />
-                  <Text className="text-xs font-semibold text-sage-700">Log a cook</Text>
-                </Pressable>
-              </Link>
+              <Pressable
+                onPress={() => router.push(`/recipe/${recipe.id}/log`)}
+                className="flex-row items-center gap-1 rounded-pill bg-sage-100 px-3 py-1.5 active:bg-sage-200"
+              >
+                <SymbolView
+                  name="plus"
+                  fallback={null}
+                  tintColor="#5A7A4B"
+                  size={13}
+                />
+                <Text className="text-xs font-semibold text-sage-700">Log a cook</Text>
+              </Pressable>
             }
           >
             {recipe.cook_logs.length === 0 ? (
