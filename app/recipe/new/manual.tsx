@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { RecipeForm } from "@/components/RecipeForm";
 import { useCreateRecipeMutation } from "@/hooks/useRecipes";
 
-export default function NewRecipeScreen() {
+export default function ManualNewRecipeScreen() {
   const router = useRouter();
   const createRecipe = useCreateRecipeMutation();
 

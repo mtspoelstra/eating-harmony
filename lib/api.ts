@@ -1,5 +1,14 @@
 import { supabase } from "@/lib/supabase";
-import type { CookLog, CookLogWithRecipe, Food, Reaction, RecipeWithDetails, Tag } from "@/lib/types";
+import type {
+  CookLog,
+  CookLogWithRecipe,
+  Food,
+  GeneratedRecipe,
+  GenerateRecipeParams,
+  Reaction,
+  RecipeWithDetails,
+  Tag,
+} from "@/lib/types";
 
 // ---------- foods ----------
 
@@ -243,6 +252,16 @@ export async function fetchAllCookLogs(): Promise<CookLogWithRecipe[]> {
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as unknown as CookLogWithRecipe[];
+}
+
+// ---------- AI recipe generation ----------
+
+export async function generateRecipe(params: GenerateRecipeParams): Promise<GeneratedRecipe> {
+  const { data, error } = await supabase.functions.invoke("generate-recipe", {
+    body: params,
+  });
+  if (error) throw error;
+  return data as GeneratedRecipe;
 }
 
 // ---------- storage ----------

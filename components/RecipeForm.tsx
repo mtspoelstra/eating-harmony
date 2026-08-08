@@ -13,13 +13,18 @@ import { RecipeInput, uploadRecipePhoto } from "@/lib/api";
 import { useAuth } from "@/lib/AuthProvider";
 import { RecipeWithDetails } from "@/lib/types";
 
+export type RecipeFormInitial = Pick<
+  RecipeWithDetails,
+  "name" | "photo_url" | "notes" | "steps" | "ingredients" | "tags"
+>;
+
 export function RecipeForm({
   initial,
   onSubmit,
   submitting,
   submitLabel,
 }: {
-  initial?: RecipeWithDetails;
+  initial?: RecipeFormInitial;
   onSubmit: (input: RecipeInput) => Promise<void>;
   submitting: boolean;
   submitLabel: string;
@@ -117,7 +122,7 @@ export function RecipeForm({
             size={13}
           />
           <Text className="text-xs font-medium text-white">
-            {photoUri ? "Change photo" : "Add photo"}
+            {photoUri ? "Change photo" : "Snap it when you make it 📸"}
           </Text>
         </View>
       </Pressable>

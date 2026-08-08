@@ -46,3 +46,22 @@ export type RecipeWithDetails = Recipe & {
 export type CookLogWithRecipe = CookLog & {
   recipe: Pick<Recipe, "id" | "name" | "photo_url">;
 };
+
+export type CookTime = "Under 15 min" | "15–30 min" | "30–60 min" | "60+ min";
+export type Difficulty = "Simple" | "Moderate" | "Complex";
+
+export type GenerateRecipeParams = {
+  mode: "surprise" | "choose";
+  ingredientIds?: string[];
+  time: CookTime;
+  difficulty: Difficulty;
+  mealType: string;
+  cuisine: string;
+};
+
+export type GeneratedRecipe = {
+  name: string;
+  steps: string[];
+  notes: string | null;
+  ingredientIds: string[];
+};

@@ -74,7 +74,7 @@ function RootLayoutNav() {
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen
         name="recipe/new"
-        options={{ title: "New Recipe", presentation: "modal" }}
+        options={{ headerShown: false, presentation: "modal" }}
       />
       <Stack.Screen
         name="recipe/[id]/edit"
