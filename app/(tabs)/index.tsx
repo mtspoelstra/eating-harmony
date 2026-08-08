@@ -1,11 +1,12 @@
 import { useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useMemo, useState } from "react";
-import { FlatList, Pressable, ScrollView, Text, View } from "react-native";
+import { FlatList, Pressable, ScrollView, View } from "react-native";
 
 import { RecipeCard } from "@/components/RecipeCard";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SegmentControl } from "@/components/ui/SegmentControl";
 import { useRecipesQuery } from "@/hooks/useRecipes";
 import { useTagsQuery } from "@/hooks/useTags";
 import { isCurrentDiet } from "@/lib/recipeStats";
@@ -35,16 +36,14 @@ export default function RecipesScreen() {
     <View className="flex-1 bg-cream-50">
       <View className="px-5 pb-3 pt-2">
         <View className="mb-3 flex-row items-center justify-between">
-          <View className="flex-1 flex-row rounded-pill bg-ink-100 p-1">
-            <SegmentButton
-              label="Current Diet"
-              active={mode === "current"}
-              onPress={() => setMode("current")}
-            />
-            <SegmentButton
-              label="All Recipes"
-              active={mode === "all"}
-              onPress={() => setMode("all")}
+          <View className="flex-1">
+            <SegmentControl
+              value={mode}
+              onChange={setMode}
+              options={[
+                { value: "current", label: "Current Diet" },
+                { value: "all", label: "All Recipes" },
+              ]}
             />
           </View>
           <Pressable
@@ -101,26 +100,5 @@ export default function RecipesScreen() {
         }
       />
     </View>
-  );
-}
-
-function SegmentButton({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className={`flex-1 items-center rounded-pill py-2 ${active ? "bg-white shadow-sm shadow-ink-900/10" : ""}`}
-    >
-      <Text className={`text-sm font-semibold ${active ? "text-terracotta-500" : "text-ink-400"}`}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }

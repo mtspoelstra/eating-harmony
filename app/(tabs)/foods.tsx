@@ -5,6 +5,7 @@ import { SymbolView } from "expo-symbols";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SegmentControl } from "@/components/ui/SegmentControl";
 import { TextField } from "@/components/ui/TextField";
 import { useAddFoodMutation, useFoodsQuery, useUpdateFoodBucketMutation } from "@/hooks/useFoods";
 import { Food } from "@/lib/types";
@@ -63,9 +64,15 @@ export default function FoodsScreen() {
 
   return (
     <View className="flex-1 bg-cream-50 px-5 pt-2">
-      <View className="mb-4 flex-row rounded-pill bg-ink-100 p-1">
-        <SegmentButton label="Current Foods" active={mode === "current"} onPress={() => setMode("current")} />
-        <SegmentButton label="All Foods" active={mode === "all"} onPress={() => setMode("all")} />
+      <View className="mb-4">
+        <SegmentControl
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "current", label: "Current Foods" },
+            { value: "all", label: "All Foods" },
+          ]}
+        />
       </View>
 
       <View className="flex-row items-end gap-3 pb-4">
@@ -132,26 +139,5 @@ export default function FoodsScreen() {
         )}
       />
     </View>
-  );
-}
-
-function SegmentButton({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className={`flex-1 items-center rounded-pill py-2 ${active ? "bg-white shadow-sm shadow-ink-900/10" : ""}`}
-    >
-      <Text className={`text-sm font-semibold ${active ? "text-terracotta-500" : "text-ink-400"}`}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
