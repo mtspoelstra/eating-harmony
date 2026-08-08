@@ -18,7 +18,8 @@ export function RecipeThumbnail({
   return (
     <View className={`items-center justify-center bg-sage-100 ${className}`}>
       <SymbolView
-        name={{ ios: "leaf.fill", android: "eco", web: "eco" }}
+        name="leaf.fill"
+        fallback={null}
         tintColor="#8FAF7C"
         size={28}
       />

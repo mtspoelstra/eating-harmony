@@ -85,7 +85,8 @@ export default function FoodsScreen() {
               className="rounded-full p-1.5 active:bg-ink-100"
             >
               <SymbolView
-                name={{ ios: "trash", android: "delete", web: "delete" }}
+                name="trash"
+                fallback={null}
                 tintColor="#BC5A2C"
                 size={19}
               />

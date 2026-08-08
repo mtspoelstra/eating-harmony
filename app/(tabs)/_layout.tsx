@@ -23,11 +23,8 @@ export default function TabLayout() {
         headerRight: () => (
           <Pressable onPress={confirmSignOut} hitSlop={10} className="mr-4">
             <SymbolView
-              name={{
-                ios: "rectangle.portrait.and.arrow.right",
-                android: "logout",
-                web: "logout",
-              }}
+              name="rectangle.portrait.and.arrow.right"
+              fallback={null}
               tintColor="#8A8477"
               size={20}
             />
@@ -47,7 +44,8 @@ export default function TabLayout() {
           title: "Recipes",
           tabBarIcon: ({ color }) => (
             <SymbolView
-              name={{ ios: "fork.knife", android: "restaurant", web: "restaurant" }}
+              name="fork.knife"
+              fallback={null}
               tintColor={color}
               size={24}
             />
@@ -60,7 +58,8 @@ export default function TabLayout() {
           title: "My Foods",
           tabBarIcon: ({ color }) => (
             <SymbolView
-              name={{ ios: "leaf.fill", android: "eco", web: "eco" }}
+              name="leaf.fill"
+              fallback={null}
               tintColor={color}
               size={24}
             />

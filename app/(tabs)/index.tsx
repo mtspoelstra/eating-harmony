@@ -48,7 +48,7 @@ export default function RecipesScreen() {
           </View>
           <Link href="/recipe/new" asChild>
             <Pressable className="ml-3 h-11 w-11 items-center justify-center rounded-full bg-terracotta-400 active:bg-terracotta-500">
-              <SymbolView name={{ ios: "plus", android: "add", web: "add" }} tintColor="#fff" size={22} />
+              <SymbolView name="plus" fallback={null} tintColor="#fff" size={22} />
             </Pressable>
           </Link>
         </View>

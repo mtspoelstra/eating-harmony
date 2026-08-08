@@ -111,7 +111,8 @@ export function RecipeForm({
         <RecipeThumbnail uri={photoUri} className="h-40 w-full rounded-card" />
         <View className="absolute bottom-2 right-2 flex-row items-center gap-1.5 rounded-pill bg-ink-900/70 px-3 py-1.5">
           <SymbolView
-            name={{ ios: "camera.fill", android: "photo_camera", web: "photo_camera" }}
+            name="camera.fill"
+            fallback={null}
             tintColor="#fff"
             size={13}
           />
@@ -156,7 +157,8 @@ export function RecipeForm({
               {steps.length > 1 && (
                 <Pressable onPress={() => removeStep(i)} hitSlop={8} className="p-1">
                   <SymbolView
-                    name={{ ios: "xmark.circle.fill", android: "cancel", web: "cancel" }}
+                    name="xmark.circle.fill"
+                    fallback={null}
                     tintColor="#8A8477"
                     size={18}
                   />

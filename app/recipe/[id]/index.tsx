@@ -46,7 +46,8 @@ export default function RecipeDetailScreen() {
               <Link href={`/recipe/${recipe.id}/edit`} asChild>
                 <Pressable hitSlop={8}>
                   <SymbolView
-                    name={{ ios: "pencil", android: "edit", web: "edit" }}
+                    name="pencil"
+                    fallback={null}
                     tintColor="#332F28"
                     size={20}
                   />
@@ -54,7 +55,8 @@ export default function RecipeDetailScreen() {
               </Link>
               <Pressable onPress={onDelete} hitSlop={8}>
                 <SymbolView
-                  name={{ ios: "trash", android: "delete", web: "delete" }}
+                  name="trash"
+                  fallback={null}
                   tintColor="#BC5A2C"
                   size={20}
                 />
@@ -132,7 +134,8 @@ export default function RecipeDetailScreen() {
               <Link href={`/recipe/${recipe.id}/log`} asChild>
                 <Pressable className="flex-row items-center gap-1 rounded-pill bg-sage-100 px-3 py-1.5 active:bg-sage-200">
                   <SymbolView
-                    name={{ ios: "plus", android: "add", web: "add" }}
+                    name="plus"
+                    fallback={null}
                     tintColor="#5A7A4B"
                     size={13}
                   />
@@ -167,7 +170,8 @@ export default function RecipeDetailScreen() {
                       className="p-1"
                     >
                       <SymbolView
-                        name={{ ios: "xmark", android: "close", web: "close" }}
+                        name="xmark"
+                        fallback={null}
                         tintColor="#8A8477"
                         size={15}
                       />
