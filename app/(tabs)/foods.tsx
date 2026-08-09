@@ -2,13 +2,13 @@ import { useMemo, useState } from "react";
 import { Alert, FlatList, Pressable, Text, View } from "react-native";
 import { SymbolView } from "expo-symbols";
 
-import { CategoryPickerModal } from "@/components/CategoryPickerModal";
+import { CategoryManagerModal } from "@/components/CategoryManagerModal";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SegmentControl } from "@/components/ui/SegmentControl";
 import { TextField } from "@/components/ui/TextField";
-import { useFoodCategoriesQuery } from "@/hooks/useFoodCategories";
+import { useFoodCategoriesQuery, useSetFoodCategoryMutation } from "@/hooks/useFoodCategories";
 import { useAddFoodMutation, useFoodsQuery, useUpdateFoodBucketMutation } from "@/hooks/useFoods";
 import { Food } from "@/lib/types";
 
@@ -23,10 +23,12 @@ export default function FoodsScreen() {
   const { data: categories } = useFoodCategoriesQuery();
   const addFood = useAddFoodMutation();
   const updateBucket = useUpdateFoodBucketMutation();
+  const setCategory = useSetFoodCategoryMutation();
   const [name, setName] = useState("");
   const [mode, setMode] = useState<ViewMode>("current");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [categoryTarget, setCategoryTarget] = useState<Food | null>(null);
+  const [selectedFoodId, setSelectedFoodId] = useState<string | null>(null);
+  const [managerOpen, setManagerOpen] = useState(false);
 
   const list = useMemo(() => {
     const sorted = [...(foods ?? [])].sort((a, b) => a.name.localeCompare(b.name));
@@ -34,6 +36,8 @@ export default function FoodsScreen() {
       ? sorted.filter((f) => f.is_current)
       : sorted.filter((f) => f.is_all_foods);
   }, [foods, mode]);
+
+  const selectedFood = list.find((f) => f.id === selectedFoodId) ?? null;
 
   const items = useMemo<ListItem[]>(() => {
     const byCategory = new Map<string, Food[]>();
@@ -77,6 +81,19 @@ export default function FoodsScreen() {
       else next.add(id);
       return next;
     });
+  };
+
+  const onHeaderPress = (headerId: string) => {
+    if (selectedFoodId) {
+      setCategory.mutate({ foodId: selectedFoodId, categoryId: headerId === "uncategorized" ? null : headerId });
+      setSelectedFoodId(null);
+    } else {
+      toggleCollapsed(headerId);
+    }
+  };
+
+  const onFoodPress = (food: Food) => {
+    setSelectedFoodId((prev) => (prev === food.id ? null : food.id));
   };
 
   const onAdd = async () => {
@@ -128,7 +145,7 @@ export default function FoodsScreen() {
         />
       </View>
 
-      <View className="flex-row items-end gap-3 pb-4">
+      <View className="flex-row items-end gap-3 pb-3">
         <TextField
           className="flex-1"
           label="Add a food you're currently eating"
@@ -141,11 +158,27 @@ export default function FoodsScreen() {
         <Button label="Add" onPress={onAdd} loading={addFood.isPending} />
       </View>
 
+      <Pressable onPress={() => setManagerOpen(true)} className="mb-3 self-start">
+        <Text className="text-sm font-semibold text-sage-600">Manage categories</Text>
+      </Pressable>
+
+      {selectedFood && (
+        <View className="mb-3 flex-row items-center justify-between rounded-2xl bg-terracotta-50 px-4 py-2.5">
+          <Text className="flex-1 text-sm font-medium text-terracotta-600">
+            Assigning "{selectedFood.name}" — tap a category below
+          </Text>
+          <Pressable onPress={() => setSelectedFoodId(null)} hitSlop={8}>
+            <Text className="text-sm font-semibold text-ink-600">Cancel</Text>
+          </Pressable>
+        </View>
+      )}
+
       <FlatList
         data={items}
         keyExtractor={(item, i) => (item.type === "header" ? `h-${item.id}` : `f-${item.food.id}-${i}`)}
         contentContainerClassName="gap-2 pb-10"
         showsVerticalScrollIndicator={false}
+        extraData={selectedFoodId}
         ListEmptyComponent={
           !isLoading ? (
             <EmptyState
@@ -162,22 +195,30 @@ export default function FoodsScreen() {
         renderItem={({ item, index }) =>
           item.type === "header" ? (
             <Pressable
-              onPress={() => toggleCollapsed(item.id)}
-              className={`flex-row items-center justify-between py-1.5 ${index === 0 ? "mt-0" : "mt-2"}`}
+              onPress={() => onHeaderPress(item.id)}
+              className={`flex-row items-center justify-between rounded-xl px-2 py-2 ${index === 0 ? "mt-0" : "mt-2"} ${
+                selectedFoodId ? "bg-sage-100" : ""
+              }`}
             >
-              <Text className="text-sm font-bold uppercase tracking-wide text-ink-400">
+              <Text
+                className={`text-sm font-bold uppercase tracking-wide ${selectedFoodId ? "text-sage-700" : "text-ink-400"}`}
+              >
                 {item.name} · {item.count}
               </Text>
               <SymbolView
-                name={item.collapsed ? "chevron.down" : "chevron.up"}
+                name={selectedFoodId ? "checkmark.circle" : item.collapsed ? "chevron.down" : "chevron.up"}
                 fallback={null}
-                tintColor="#8A8477"
+                tintColor={selectedFoodId ? "#5A7A4B" : "#8A8477"}
                 size={14}
               />
             </Pressable>
           ) : (
-            <Card className="flex-row items-center justify-between py-3">
-              <Pressable className="flex-1" onPress={() => setCategoryTarget(item.food)}>
+            <Card
+              className={`flex-row items-center justify-between border py-3 ${
+                item.food.id === selectedFoodId ? "border-terracotta-400 bg-terracotta-50" : "border-transparent"
+              }`}
+            >
+              <Pressable className="flex-1" onPress={() => onFoodPress(item.food)}>
                 <Text className="text-base font-medium text-ink-800">{item.food.name}</Text>
                 <Text className="mt-0.5 text-xs text-ink-400">
                   {item.food.categories[0]?.name ?? "Uncategorized"}
@@ -214,7 +255,7 @@ export default function FoodsScreen() {
         }
       />
 
-      <CategoryPickerModal food={categoryTarget} onClose={() => setCategoryTarget(null)} />
+      <CategoryManagerModal visible={managerOpen} onClose={() => setManagerOpen(false)} />
     </View>
   );
 }
