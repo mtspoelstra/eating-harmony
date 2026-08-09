@@ -1,5 +1,13 @@
 export type Reaction = "great" | "okay" | "rough";
 
+export type FoodCategory = {
+  id: string;
+  user_id: string;
+  name: string;
+  is_default: boolean;
+  created_at: string;
+};
+
 export type Food = {
   id: string;
   user_id: string;
@@ -7,7 +15,10 @@ export type Food = {
   is_current: boolean;
   is_all_foods: boolean;
   created_at: string;
+  categories: FoodCategory[];
 };
+
+export type RecipeIngredient = Food & { quantity: string | null };
 
 export type Tag = {
   id: string;
@@ -38,7 +49,7 @@ export type Recipe = {
 };
 
 export type RecipeWithDetails = Recipe & {
-  ingredients: Food[];
+  ingredients: RecipeIngredient[];
   tags: Tag[];
   cook_logs: CookLog[];
 };
@@ -57,11 +68,14 @@ export type GenerateRecipeParams = {
   difficulty: Difficulty;
   mealType: string;
   cuisine: string;
+  extraRequests?: string;
 };
+
+export type GeneratedIngredient = { foodId: string; quantity: string };
 
 export type GeneratedRecipe = {
   name: string;
   steps: string[];
   notes: string | null;
-  ingredientIds: string[];
+  ingredients: GeneratedIngredient[];
 };

@@ -101,7 +101,12 @@ export default function RecipeDetailScreen() {
                       food.is_current ? "bg-sage-500" : "bg-ink-100"
                     }`}
                   />
-                  <Text className="text-base text-ink-800">{food.name}</Text>
+                  <Text className="text-base text-ink-800">
+                    {food.quantity ? (
+                      <Text className="font-semibold text-ink-600">{food.quantity} </Text>
+                    ) : null}
+                    {food.name}
+                  </Text>
                 </View>
               ))}
             </View>

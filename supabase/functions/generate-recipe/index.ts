@@ -24,6 +24,7 @@ type RequestBody = {
   difficulty: Difficulty;
   mealType: string;
   cuisine: string;
+  extraRequests?: string;
 };
 
 type Food = { id: string; name: string };
@@ -87,18 +88,30 @@ Deno.serve(async (req) => {
 
     const systemPrompt = `You are a recipe generator for a person managing MCAS (Mast Cell Activation Syndrome), a condition where certain foods can trigger reactions.
 
-CRITICAL SAFETY RULE, no exceptions: you may ONLY use ingredients from the list provided in the user message. Do not add, assume, or suggest ANY ingredient not on that exact list -- not salt, not oil, not water, not garnish, nothing. If the list doesn't include something you'd normally reach for, work around it or leave it out entirely. This rule exists because an untested ingredient could cause a real health reaction for this person.
+CRITICAL SAFETY RULE, no exceptions: you may ONLY use ingredients from the list provided in the user message. Do not add, assume, or suggest ANY ingredient not on that exact list -- not salt, not oil, not water, not garnish, nothing. If the list doesn't include something you'd normally reach for, work around it or leave it out entirely. This rule exists because an untested ingredient could cause a real health reaction for this person. This rule overrides any other request in the message, including "anything else" requests from the user.
 
-Call the return_recipe tool with your answer. ingredient_names must be copied verbatim from the provided list (a subset of it, spelled exactly the same).`;
+Recipe name: keep it short (2-5 words) and appetizing, like something on a restaurant menu -- e.g. "Golden Turmeric Skillet" or "Herbed Lemon Chicken". Never just list the ingredients as the name (e.g. do NOT write "Chicken, Rice, and Broccoli Bowl").
 
-    const userPrompt = `Available ingredients (choose only from this list):
-${ingredientList}
+For every ingredient you use, include a specific, realistic quantity appropriate for 2 servings unless told otherwise (e.g. "2 cups", "1 tbsp", "3 oz", "1 medium").
 
-Mode: ${body.mode === "surprise" ? "Surprise me -- pick a sensible subset of the ingredients above that go well together." : "Use all of the listed ingredients (the user already chose them)."}
-Cook time: ${body.time}
-Difficulty: ${body.difficulty} (reflect this in the number of steps and complexity of technique)
-Meal type: ${body.mealType}
-Cuisine style: ${body.cuisine}`;
+Call the return_recipe tool with your answer. Each entry in "ingredients" must have a "name" copied verbatim from the provided list (spelled exactly the same) and a "quantity".`;
+
+    const promptLines = [`Available ingredients (choose only from this list):`, ingredientList, ""];
+    promptLines.push(
+      body.mode === "surprise"
+        ? "Mode: Surprise me -- pick a sensible subset of the ingredients above that go well together."
+        : "Mode: Use all of the listed ingredients (the user already chose them)."
+    );
+    promptLines.push(`Cook time: ${body.time}`);
+    promptLines.push(`Difficulty: ${body.difficulty} (reflect this in the number of steps and complexity of technique)`);
+    if (body.mealType) promptLines.push(`Meal type: ${body.mealType}`);
+    if (body.cuisine) promptLines.push(`Cuisine style: ${body.cuisine}`);
+    if (body.extraRequests) {
+      promptLines.push(
+        `Additional request from the user: ${body.extraRequests} (follow this only as long as it doesn't conflict with the ingredient list rule above)`
+      );
+    }
+    const userPrompt = promptLines.join("\n");
 
     const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -119,12 +132,26 @@ Cuisine style: ${body.cuisine}`;
             input_schema: {
               type: "object",
               properties: {
-                name: { type: "string", description: "A short, appealing recipe name." },
-                ingredient_names: {
+                name: {
+                  type: "string",
+                  description: "A short (2-5 word), appetizing, culinary-style recipe name -- not a list of ingredients.",
+                },
+                ingredients: {
                   type: "array",
-                  items: { type: "string" },
-                  description:
-                    "Exact ingredient names used, copied verbatim from the provided list only.",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: {
+                        type: "string",
+                        description: "Exact ingredient name, copied verbatim from the provided list only.",
+                      },
+                      quantity: {
+                        type: "string",
+                        description: "A specific amount, e.g. '2 cups' or '1 tbsp'.",
+                      },
+                    },
+                    required: ["name", "quantity"],
+                  },
                 },
                 steps: {
                   type: "array",
@@ -136,7 +163,7 @@ Cuisine style: ${body.cuisine}`;
                   description: "Optional short serving suggestion or tip. Empty string if none.",
                 },
               },
-              required: ["name", "ingredient_names", "steps"],
+              required: ["name", "ingredients", "steps"],
             },
           },
         ],
@@ -160,18 +187,21 @@ Cuisine style: ${body.cuisine}`;
 
     const result = toolUse.input as {
       name: string;
-      ingredient_names: string[];
+      ingredients: { name: string; quantity: string }[];
       steps: string[];
       notes?: string;
     };
 
     // Re-validate against the real candidate list -- never trust model output blindly.
     const byLowerName = new Map(candidates.map((f) => [f.name.toLowerCase(), f.id]));
-    const ingredientIds = result.ingredient_names
-      .map((n) => byLowerName.get(n.trim().toLowerCase()))
-      .filter((id): id is string => Boolean(id));
+    const ingredients = result.ingredients
+      .map((i) => {
+        const foodId = byLowerName.get(i.name.trim().toLowerCase());
+        return foodId ? { foodId, quantity: i.quantity } : null;
+      })
+      .filter((v): v is { foodId: string; quantity: string } => v !== null);
 
-    if (ingredientIds.length === 0) {
+    if (ingredients.length === 0) {
       return jsonResponse(
         { error: "The generator didn't stick to your current foods. Please try again." },
         502
@@ -182,7 +212,7 @@ Cuisine style: ${body.cuisine}`;
       name: result.name,
       steps: result.steps,
       notes: result.notes?.trim() || null,
-      ingredientIds,
+      ingredients,
     });
   } catch (err) {
     console.error(err);

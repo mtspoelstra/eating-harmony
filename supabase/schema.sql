@@ -54,6 +54,104 @@ create policy "foods_delete_own" on public.foods
   for delete using (auth.uid() = user_id);
 
 -- ============================================================
+-- FOOD_CATEGORIES (per user, e.g. Protein, Veggie, Fruit, Carb...)
+-- Every user gets the 5 defaults seeded automatically (new users via the
+-- trigger below; existing users via the one-time backfill further down).
+-- Deleting a category never deletes any food, and deleting a food never
+-- deletes any category -- only the link between them (food_category_members)
+-- goes away, via that join table's own delete cascades.
+-- ============================================================
+create table if not exists public.food_categories (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  name text not null,
+  is_default boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists food_categories_user_name_unique
+  on public.food_categories (user_id, lower(name));
+
+alter table public.food_categories enable row level security;
+
+drop policy if exists "food_categories_select_own" on public.food_categories;
+create policy "food_categories_select_own" on public.food_categories
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "food_categories_insert_own" on public.food_categories;
+create policy "food_categories_insert_own" on public.food_categories
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "food_categories_update_own" on public.food_categories;
+create policy "food_categories_update_own" on public.food_categories
+  for update using (auth.uid() = user_id);
+
+drop policy if exists "food_categories_delete_own" on public.food_categories;
+create policy "food_categories_delete_own" on public.food_categories
+  for delete using (auth.uid() = user_id);
+
+-- ============================================================
+-- FOOD_CATEGORY_MEMBERS (join table: foods <-> food_categories)
+-- ============================================================
+create table if not exists public.food_category_members (
+  food_id uuid not null references public.foods (id) on delete cascade,
+  category_id uuid not null references public.food_categories (id) on delete cascade,
+  primary key (food_id, category_id)
+);
+
+alter table public.food_category_members enable row level security;
+
+drop policy if exists "food_category_members_select_own" on public.food_category_members;
+create policy "food_category_members_select_own" on public.food_category_members
+  for select using (
+    exists (select 1 from public.foods f where f.id = food_id and f.user_id = auth.uid())
+  );
+
+drop policy if exists "food_category_members_insert_own" on public.food_category_members;
+create policy "food_category_members_insert_own" on public.food_category_members
+  for insert with check (
+    exists (select 1 from public.foods f where f.id = food_id and f.user_id = auth.uid())
+  );
+
+drop policy if exists "food_category_members_delete_own" on public.food_category_members;
+create policy "food_category_members_delete_own" on public.food_category_members
+  for delete using (
+    exists (select 1 from public.foods f where f.id = food_id and f.user_id = auth.uid())
+  );
+
+-- Seed the 5 default categories for every NEW user automatically.
+create or replace function public.seed_default_food_categories()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.food_categories (user_id, name, is_default)
+  values
+    (new.id, 'Protein', true),
+    (new.id, 'Veggie', true),
+    (new.id, 'Fruit', true),
+    (new.id, 'Carb', true),
+    (new.id, 'Herbs and Spices', true)
+  on conflict do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created_seed_categories on auth.users;
+create trigger on_auth_user_created_seed_categories
+  after insert on auth.users
+  for each row execute function public.seed_default_food_categories();
+
+-- Backfill: seed the defaults for any user who already existed before this
+-- ran (the trigger above only fires for brand-new signups).
+insert into public.food_categories (user_id, name, is_default)
+select u.id, cat.name, true
+from auth.users u
+cross join (values ('Protein'), ('Veggie'), ('Fruit'), ('Carb'), ('Herbs and Spices')) as cat(name)
+on conflict do nothing;
+
+-- ============================================================
 -- TAGS (per user, e.g. Breakfast, Dinner, Quick, Comfort Food)
 -- ============================================================
 create table if not exists public.tags (
@@ -118,12 +216,16 @@ create policy "recipes_delete_own" on public.recipes
 
 -- ============================================================
 -- RECIPE_INGREDIENTS (join table: recipe <-> foods)
+-- "quantity" is free text ("2 cups", "1 tbsp") so it stays flexible.
 -- ============================================================
 create table if not exists public.recipe_ingredients (
   recipe_id uuid not null references public.recipes (id) on delete cascade,
   food_id uuid not null references public.foods (id) on delete cascade,
+  quantity text,
   primary key (recipe_id, food_id)
 );
+
+alter table public.recipe_ingredients add column if not exists quantity text;
 
 alter table public.recipe_ingredients enable row level security;
 

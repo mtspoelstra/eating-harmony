@@ -3,13 +3,14 @@ import { SymbolView } from "expo-symbols";
 import { useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 
+import { IngredientPicker } from "@/components/IngredientPicker";
 import { MultiSelectPicker } from "@/components/MultiSelectPicker";
 import { Button } from "@/components/ui/Button";
 import { RecipeThumbnail } from "@/components/ui/RecipeThumbnail";
 import { TextField } from "@/components/ui/TextField";
 import { useAddFoodMutation, useFoodsQuery } from "@/hooks/useFoods";
 import { useFindOrCreateTagMutation, useTagsQuery } from "@/hooks/useTags";
-import { RecipeInput, uploadRecipePhoto } from "@/lib/api";
+import { RecipeIngredientInput, RecipeInput, uploadRecipePhoto } from "@/lib/api";
 import { useAuth } from "@/lib/AuthProvider";
 import { RecipeWithDetails } from "@/lib/types";
 
@@ -38,8 +39,8 @@ export function RecipeForm({
   const [name, setName] = useState(initial?.name ?? "");
   const [photoUri, setPhotoUri] = useState<string | null>(initial?.photo_url ?? null);
   const [photoChanged, setPhotoChanged] = useState(false);
-  const [ingredientIds, setIngredientIds] = useState<string[]>(
-    initial?.ingredients.map((i) => i.id) ?? []
+  const [ingredients, setIngredients] = useState<RecipeIngredientInput[]>(
+    initial?.ingredients.map((i) => ({ foodId: i.id, quantity: i.quantity })) ?? []
   );
   const [tagIds, setTagIds] = useState<string[]>(initial?.tags.map((t) => t.id) ?? []);
   const [steps, setSteps] = useState<string[]>(initial?.steps.length ? initial.steps : [""]);
@@ -75,7 +76,7 @@ export function RecipeForm({
       Alert.alert("Name it", "Give your recipe a name.");
       return;
     }
-    if (ingredientIds.length === 0) {
+    if (ingredients.length === 0) {
       Alert.alert("Add ingredients", "Pick at least one ingredient.");
       return;
     }
@@ -101,7 +102,7 @@ export function RecipeForm({
       steps: steps.map((s) => s.trim()).filter(Boolean),
       notes: notes.trim() || null,
       photo_url: photoUrl,
-      ingredientIds,
+      ingredients,
       tagIds,
     });
   };
@@ -129,11 +130,11 @@ export function RecipeForm({
 
       <TextField label="Name" value={name} onChangeText={setName} placeholder="Golden turmeric rice" />
 
-      <MultiSelectPicker
+      <IngredientPicker
         label="Ingredients"
         items={foods ?? []}
-        selectedIds={ingredientIds}
-        onChange={setIngredientIds}
+        value={ingredients}
+        onChange={setIngredients}
         onCreate={(n) => addFood.mutateAsync(n)}
         placeholder="Search or add an ingredient"
       />
@@ -151,16 +152,18 @@ export function RecipeForm({
         <Text className="mb-2 text-sm font-medium text-ink-600">Steps</Text>
         <View className="gap-2.5">
           {steps.map((step, i) => (
-            <View key={i} className="flex-row items-center gap-2">
-              <Text className="w-5 text-sm font-semibold text-terracotta-400">{i + 1}</Text>
+            <View key={i} className="flex-row items-start gap-2">
+              <Text className="w-5 pt-3.5 text-sm font-semibold text-terracotta-400">{i + 1}</Text>
               <TextField
-                className="flex-1"
+                className="min-h-14 flex-1"
                 value={step}
                 onChangeText={(v) => updateStep(i, v)}
                 placeholder={`Step ${i + 1}`}
+                multiline
+                textAlignVertical="top"
               />
               {steps.length > 1 && (
-                <Pressable onPress={() => removeStep(i)} hitSlop={8} className="p-1">
+                <Pressable onPress={() => removeStep(i)} hitSlop={8} className="p-1 pt-3.5">
                   <SymbolView
                     name="xmark.circle.fill"
                     fallback={null}

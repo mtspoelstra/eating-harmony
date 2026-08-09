@@ -10,14 +10,24 @@ import { useFoodsQuery } from "@/hooks/useFoods";
 import { useGenerateRecipeMutation } from "@/hooks/useGenerateRecipe";
 import { useCreateRecipeMutation } from "@/hooks/useRecipes";
 import { useFindOrCreateTagMutation } from "@/hooks/useTags";
-import { CookTime, Difficulty, Food, GeneratedRecipe, Tag } from "@/lib/types";
+import { CookTime, Difficulty, GeneratedRecipe, RecipeIngredient, Tag } from "@/lib/types";
 
-type Step = "mode" | "ingredients" | "time" | "difficulty" | "mealType" | "cuisine" | "generating" | "review";
+type Step =
+  | "mode"
+  | "ingredients"
+  | "time"
+  | "difficulty"
+  | "mealType"
+  | "cuisine"
+  | "extra"
+  | "generating"
+  | "review";
 
 const TIMES: CookTime[] = ["Under 15 min", "15–30 min", "30–60 min", "60+ min"];
 const DIFFICULTIES: Difficulty[] = ["Simple", "Moderate", "Complex"];
-const MEAL_TYPES = ["Breakfast", "Lunch", "Dinner", "Snack", "Dessert", "Romantic Dinner"];
+const MEAL_TYPES = ["Any", "Breakfast", "Lunch", "Dinner", "Snack", "Dessert", "Romantic Dinner"];
 const CUISINES = [
+  "Any",
   "Italian",
   "Thai",
   "Indian",
@@ -48,32 +58,34 @@ export default function GenerateRecipeScreen() {
   const [cuisine, setCuisine] = useState("");
   const [customMealType, setCustomMealType] = useState("");
   const [customCuisine, setCustomCuisine] = useState("");
+  const [extraRequests, setExtraRequests] = useState("");
 
   const [generated, setGenerated] = useState<GeneratedRecipe | null>(null);
   const [resolvedTags, setResolvedTags] = useState<Tag[]>([]);
 
-  const runGeneration = async (finalCuisine: string) => {
+  const runGeneration = async (finalExtraRequests: string) => {
     setStep("generating");
     try {
-      const [result, mealTag, cuisineTag] = await Promise.all([
+      const tagNames = [mealType, cuisine].filter((v) => v && v !== "Any");
+      const [result, ...tags] = await Promise.all([
         generateRecipe.mutateAsync({
           mode: mode!,
           ingredientIds: mode === "choose" ? selectedIngredientIds : undefined,
           time: time!,
           difficulty: difficulty!,
-          mealType,
-          cuisine: finalCuisine,
+          mealType: mealType === "Any" ? "" : mealType,
+          cuisine: cuisine === "Any" ? "" : cuisine,
+          extraRequests: finalExtraRequests.trim() || undefined,
         }),
-        findOrCreateTag.mutateAsync(mealType),
-        findOrCreateTag.mutateAsync(finalCuisine),
+        ...tagNames.map((n) => findOrCreateTag.mutateAsync(n)),
       ]);
       setGenerated(result);
-      setResolvedTags([mealTag, cuisineTag]);
+      setResolvedTags(tags);
       setStep("review");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Couldn't generate a recipe.";
       Alert.alert("Generation failed", message);
-      setStep("cuisine");
+      setStep("extra");
     }
   };
 
@@ -87,7 +99,12 @@ export default function GenerateRecipeScreen() {
   }
 
   if (step === "review" && generated) {
-    const ingredients: Food[] = currentFoods.filter((f) => generated.ingredientIds.includes(f.id));
+    const ingredients: RecipeIngredient[] = [];
+    for (const gi of generated.ingredients) {
+      const food = currentFoods.find((f) => f.id === gi.foodId);
+      if (food) ingredients.push({ ...food, quantity: gi.quantity });
+    }
+
     const initial: RecipeFormInitial = {
       name: generated.name,
       photo_url: null,
@@ -102,7 +119,7 @@ export default function GenerateRecipeScreen() {
         <View className="items-center bg-sage-100 py-2.5">
           <Text
             className="text-sm font-semibold text-sage-700"
-            onPress={() => runGeneration(cuisine)}
+            onPress={() => runGeneration(extraRequests)}
           >
             ✨ Not quite right? Tap to generate a different one
           </Text>
@@ -228,17 +245,40 @@ export default function GenerateRecipeScreen() {
         <StepSection title="Any style you're craving?">
           <View className="flex-row flex-wrap gap-2">
             {CUISINES.map((c) => (
-              <Chip key={c} label={c} tone="sage" selected={cuisine === c} onPress={() => { setCuisine(c); runGeneration(c); }} />
+              <Chip key={c} label={c} tone="sage" selected={cuisine === c} onPress={() => { setCuisine(c); setStep("extra"); }} />
             ))}
           </View>
           <Text className="mt-1 text-sm font-medium text-ink-600">Something else?</Text>
           <View className="flex-row items-end gap-3">
             <TextField className="flex-1" value={customCuisine} onChangeText={setCustomCuisine} placeholder="e.g. Fusion" />
             <Button
-              label="Generate"
-              onPress={() => { const v = customCuisine.trim(); setCuisine(v); runGeneration(v); }}
+              label="Use this"
+              variant="secondary"
+              onPress={() => { setCuisine(customCuisine.trim()); setStep("extra"); }}
               disabled={!customCuisine.trim()}
             />
+          </View>
+        </StepSection>
+      )}
+
+      {step === "extra" && (
+        <StepSection title="Anything else we should know?">
+          <TextField
+            value={extraRequests}
+            onChangeText={setExtraRequests}
+            placeholder="e.g. make it kid-friendly, keep it low-sodium..."
+            multiline
+            numberOfLines={4}
+            className="min-h-24"
+            textAlignVertical="top"
+          />
+          <View className="flex-row gap-3">
+            <View className="flex-1">
+              <Button label="No more requests" variant="secondary" onPress={() => runGeneration("")} />
+            </View>
+            <View className="flex-1">
+              <Button label="Generate" onPress={() => runGeneration(extraRequests)} />
+            </View>
           </View>
         </StepSection>
       )}
