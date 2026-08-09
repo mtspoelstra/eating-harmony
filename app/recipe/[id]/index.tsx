@@ -20,7 +20,8 @@ export default function RecipeDetailScreen() {
   }
 
   const inDiet = isCurrentDiet(recipe);
-  const missing = recipe.ingredients.filter((f) => !f.is_current);
+  const pausedIngredients = recipe.ingredients.filter((f) => f.status === "paused");
+  const exceptionIngredients = recipe.ingredients.filter((f) => f.status === "exception");
 
   const onDelete = () => {
     Alert.alert("Delete recipe?", `"${recipe.name}" will be permanently removed.`, [
@@ -85,10 +86,17 @@ export default function RecipeDetailScreen() {
             </Text>
           </View>
 
-          {!inDiet && missing.length > 0 && (
-            <Text className="mb-4 text-xs leading-4 text-ink-400">
-              Needs: {missing.map((f) => f.name).join(", ")} — add {missing.length > 1 ? "these" : "this"}{" "}
-              to My Foods to unlock it.
+          {pausedIngredients.length > 0 && (
+            <Text className="mb-2 text-xs leading-4 text-ink-400">
+              Paused: {pausedIngredients.map((f) => f.name).join(", ")} — move{" "}
+              {pausedIngredients.length > 1 ? "these" : "this"} back to Current Foods to unlock it.
+            </Text>
+          )}
+
+          {exceptionIngredients.length > 0 && (
+            <Text className="mb-4 text-xs leading-4 text-terracotta-600">
+              Exceptions: {exceptionIngredients.map((f) => f.name).join(", ")} —{" "}
+              {exceptionIngredients.length > 1 ? "these aren't" : "this isn't"} on your foods list.
             </Text>
           )}
 
@@ -98,7 +106,11 @@ export default function RecipeDetailScreen() {
                 <View key={food.id} className="flex-row items-center gap-2.5">
                   <View
                     className={`h-1.5 w-1.5 rounded-full ${
-                      food.is_current ? "bg-sage-500" : "bg-ink-100"
+                      food.status === "current"
+                        ? "bg-sage-500"
+                        : food.status === "paused"
+                          ? "bg-ink-100"
+                          : "bg-terracotta-500"
                     }`}
                   />
                   <Text className="text-base text-ink-800">

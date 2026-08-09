@@ -6,31 +6,54 @@ create extension if not exists "pgcrypto";
 
 -- ============================================================
 -- FOODS (master ingredient list, per user)
--- A food lives in exactly one bucket at a time:
---   is_current = true   -> shows under "Current Foods"
---   is_all_foods = true -> shows under "All Foods" (moved out of current,
---                          kept around for quick re-adding)
---   both false           -> archived/hidden from both lists
--- Recipes reference foods via recipe_ingredients, so moving a food out of
--- Current Foods just makes recipes that use it drop out of "Current Diet"
--- -- it does not delete the food or break any recipe.
+-- Every food sits in exactly one of three states:
+--   'current'   -> I tolerate this right now.       Green dot on recipes.
+--   'paused'    -> Usually fine, not right now.     Grey dot on recipes.
+--   'exception' -> Not something I eat; it only exists because a recipe
+--                  calls for it.                    Red dot on recipes.
+-- Changing a food's status never deletes it or breaks a recipe -- it just
+-- changes which recipes qualify for "Current Diet". Deleting a food IS
+-- permanent and cascades to recipe_ingredients, so the app warns first.
 -- ============================================================
 create table if not exists public.foods (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   name text not null,
-  is_current boolean not null default true,
-  is_all_foods boolean not null default false,
+  status text not null default 'current',
   created_at timestamptz not null default now()
 );
 
--- If this table already existed before is_all_foods was added, this backfills
--- existing rows so nothing that was visible before silently disappears:
-alter table public.foods add column if not exists is_all_foods boolean;
-update public.foods set is_all_foods = true where is_current = false and is_all_foods is null;
-update public.foods set is_all_foods = false where is_all_foods is null;
-alter table public.foods alter column is_all_foods set default false;
-alter table public.foods alter column is_all_foods set not null;
+-- Migration from the older two-boolean model (is_current / is_all_foods).
+-- Safe to re-run: no-ops once the columns are gone.
+alter table public.foods add column if not exists status text;
+
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'foods' and column_name = 'is_current'
+  ) then
+    update public.foods set status = 'current' where status is null and is_current = true;
+  end if;
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'foods' and column_name = 'is_all_foods'
+  ) then
+    update public.foods set status = 'paused' where status is null and is_all_foods = true;
+  end if;
+end $$;
+
+update public.foods set status = 'exception' where status is null;
+
+alter table public.foods alter column status set default 'current';
+alter table public.foods alter column status set not null;
+
+alter table public.foods drop constraint if exists foods_status_check;
+alter table public.foods add constraint foods_status_check
+  check (status in ('current', 'paused', 'exception'));
+
+alter table public.foods drop column if exists is_current;
+alter table public.foods drop column if exists is_all_foods;
 
 create unique index if not exists foods_user_name_unique
   on public.foods (user_id, lower(name));

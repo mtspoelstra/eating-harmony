@@ -4,6 +4,7 @@ import type {
   CookLogWithRecipe,
   Food,
   FoodCategory,
+  FoodStatus,
   GeneratedRecipe,
   GenerateRecipeParams,
   Reaction,
@@ -34,7 +35,11 @@ export async function fetchFoods(): Promise<Food[]> {
   return (data as unknown as RawFoodRow[]).map(mapFood);
 }
 
-export async function addOrRestoreFood(userId: string, name: string): Promise<Food> {
+export async function addOrRestoreFood(
+  userId: string,
+  name: string,
+  status: FoodStatus = "current"
+): Promise<Food> {
   const trimmed = name.trim();
   const { data: existing, error: findError } = await supabase
     .from("foods")
@@ -45,10 +50,10 @@ export async function addOrRestoreFood(userId: string, name: string): Promise<Fo
 
   if (existing) {
     const existingFood = mapFood(existing as unknown as RawFoodRow);
-    if (existingFood.is_current) return existingFood;
+    if (existingFood.status === status) return existingFood;
     const { data, error } = await supabase
       .from("foods")
-      .update({ is_current: true, is_all_foods: false })
+      .update({ status })
       .eq("id", existingFood.id)
       .select(FOOD_SELECT)
       .single();
@@ -58,18 +63,32 @@ export async function addOrRestoreFood(userId: string, name: string): Promise<Fo
 
   const { data, error } = await supabase
     .from("foods")
-    .insert({ user_id: userId, name: trimmed, is_current: true, is_all_foods: false })
+    .insert({ user_id: userId, name: trimmed, status })
     .select(FOOD_SELECT)
     .single();
   if (error) throw error;
   return mapFood(data as unknown as RawFoodRow);
 }
 
-export async function updateFoodBucket(
-  foodId: string,
-  bucket: { is_current: boolean; is_all_foods: boolean }
-): Promise<void> {
-  const { error } = await supabase.from("foods").update(bucket).eq("id", foodId);
+export async function updateFoodStatus(foodId: string, status: FoodStatus): Promise<void> {
+  const { error } = await supabase.from("foods").update({ status }).eq("id", foodId);
+  if (error) throw error;
+}
+
+/** How many recipes reference this food. Used to warn before a hard delete. */
+export async function countRecipesUsingFood(foodId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("recipe_ingredients")
+    .select("recipe_id", { count: "exact", head: true })
+    .eq("food_id", foodId);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/** Permanently deletes the food. Cascades to recipe_ingredients, so any
+ *  recipe using it loses that ingredient. Warn the user before calling. */
+export async function deleteFood(foodId: string): Promise<void> {
+  const { error } = await supabase.from("foods").delete().eq("id", foodId);
   if (error) throw error;
 }
 

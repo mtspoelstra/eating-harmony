@@ -1,7 +1,18 @@
 import { RecipeWithDetails } from "@/lib/types";
 
 export function isCurrentDiet(recipe: Pick<RecipeWithDetails, "ingredients">): boolean {
-  return recipe.ingredients.length > 0 && recipe.ingredients.every((food) => food.is_current);
+  return (
+    recipe.ingredients.length > 0 &&
+    recipe.ingredients.every((food) => food.status === "current")
+  );
+}
+
+export function pausedCount(recipe: Pick<RecipeWithDetails, "ingredients">): number {
+  return recipe.ingredients.filter((food) => food.status === "paused").length;
+}
+
+export function exceptionCount(recipe: Pick<RecipeWithDetails, "ingredients">): number {
+  return recipe.ingredients.filter((food) => food.status === "exception").length;
 }
 
 export function timesCooked(recipe: Pick<RecipeWithDetails, "cook_logs">): number {

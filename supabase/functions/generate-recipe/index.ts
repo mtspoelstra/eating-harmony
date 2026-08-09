@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
     const { data: currentFoods, error: foodsError } = await supabase
       .from("foods")
       .select("id, name")
-      .eq("is_current", true);
+      .eq("status", "current");
     if (foodsError) throw foodsError;
 
     let candidates: Food[] = currentFoods ?? [];

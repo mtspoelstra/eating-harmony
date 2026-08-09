@@ -9,33 +9,51 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { SegmentControl } from "@/components/ui/SegmentControl";
 import { TextField } from "@/components/ui/TextField";
 import { useFoodCategoriesQuery, useSetFoodCategoryMutation } from "@/hooks/useFoodCategories";
-import { useAddFoodMutation, useFoodsQuery, useUpdateFoodBucketMutation } from "@/hooks/useFoods";
-import { Food } from "@/lib/types";
-
-type ViewMode = "current" | "all";
+import {
+  countRecipesUsingFood,
+  useAddFoodMutation,
+  useDeleteFoodMutation,
+  useFoodsQuery,
+  useUpdateFoodStatusMutation,
+} from "@/hooks/useFoods";
+import { Food, FoodStatus } from "@/lib/types";
 
 type ListItem =
   | { type: "header"; id: string; name: string; count: number; collapsed: boolean }
   | { type: "food"; food: Food };
 
+const STATUS_LABELS: Record<FoodStatus, string> = {
+  current: "Current",
+  paused: "Paused",
+  exception: "Exceptions",
+};
+
+const ADD_PLACEHOLDER: Record<FoodStatus, string> = {
+  current: "Add a food you're eating now",
+  paused: "Add a food you're pausing",
+  exception: "Add an exception food",
+};
+
 export default function FoodsScreen() {
   const { data: foods, isLoading } = useFoodsQuery();
   const { data: categories } = useFoodCategoriesQuery();
   const addFood = useAddFoodMutation();
-  const updateBucket = useUpdateFoodBucketMutation();
+  const updateStatus = useUpdateFoodStatusMutation();
+  const deleteFood = useDeleteFoodMutation();
   const setCategory = useSetFoodCategoryMutation();
   const [name, setName] = useState("");
-  const [mode, setMode] = useState<ViewMode>("current");
+  const [status, setStatus] = useState<FoodStatus>("current");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selectedFoodId, setSelectedFoodId] = useState<string | null>(null);
   const [managerOpen, setManagerOpen] = useState(false);
 
-  const list = useMemo(() => {
-    const sorted = [...(foods ?? [])].sort((a, b) => a.name.localeCompare(b.name));
-    return mode === "current"
-      ? sorted.filter((f) => f.is_current)
-      : sorted.filter((f) => f.is_all_foods);
-  }, [foods, mode]);
+  const list = useMemo(
+    () =>
+      [...(foods ?? [])]
+        .filter((f) => f.status === status)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [foods, status]
+  );
 
   const selectedFood = list.find((f) => f.id === selectedFoodId) ?? null;
 
@@ -57,7 +75,13 @@ export default function FoodsScreen() {
     for (const cat of categories ?? []) {
       const inCategory = byCategory.get(cat.id) ?? [];
       const isCollapsed = collapsed.has(cat.id);
-      result.push({ type: "header", id: cat.id, name: cat.name, count: inCategory.length, collapsed: isCollapsed });
+      result.push({
+        type: "header",
+        id: cat.id,
+        name: cat.name,
+        count: inCategory.length,
+        collapsed: isCollapsed,
+      });
       if (!isCollapsed) inCategory.forEach((food) => result.push({ type: "food", food }));
     }
     if (uncategorized.length > 0) {
@@ -85,15 +109,14 @@ export default function FoodsScreen() {
 
   const onHeaderPress = (headerId: string) => {
     if (selectedFoodId) {
-      setCategory.mutate({ foodId: selectedFoodId, categoryId: headerId === "uncategorized" ? null : headerId });
+      setCategory.mutate({
+        foodId: selectedFoodId,
+        categoryId: headerId === "uncategorized" ? null : headerId,
+      });
       setSelectedFoodId(null);
     } else {
       toggleCollapsed(headerId);
     }
-  };
-
-  const onFoodPress = (food: Food) => {
-    setSelectedFoodId((prev) => (prev === food.id ? null : food.id));
   };
 
   const onAdd = async () => {
@@ -101,46 +124,66 @@ export default function FoodsScreen() {
     if (!trimmed) return;
     setName("");
     try {
-      await addFood.mutateAsync(trimmed);
+      await addFood.mutateAsync({ name: trimmed, status });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Couldn't add that food.";
       Alert.alert("Couldn't add food", message);
     }
   };
 
-  const onArchive = (food: Food) => {
-    Alert.alert(
-      `Remove ${food.name}?`,
-      "It'll be tucked away completely — recipes using it will move out of Current Diet. You can always re-add it later.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () =>
-            updateBucket.mutate({ foodId: food.id, is_current: false, is_all_foods: false }),
-        },
-      ]
-    );
+  const onChangeStatus = (food: Food) => {
+    const options: { label: string; value: FoodStatus }[] = (
+      ["current", "paused", "exception"] as FoodStatus[]
+    )
+      .filter((s) => s !== food.status)
+      .map((s) => ({ label: `Move to ${STATUS_LABELS[s]}`, value: s }));
+
+    Alert.alert(food.name, "Where should this food live?", [
+      ...options.map((opt) => ({
+        text: opt.label,
+        onPress: () => updateStatus.mutate({ foodId: food.id, status: opt.value }),
+      })),
+      { text: "Cancel", style: "cancel" as const },
+    ]);
   };
 
-  const onMove = (food: Food) => {
-    if (food.is_current) {
-      updateBucket.mutate({ foodId: food.id, is_current: false, is_all_foods: true });
-    } else {
-      updateBucket.mutate({ foodId: food.id, is_current: true, is_all_foods: false });
+  const onDelete = async (food: Food) => {
+    let usedBy = 0;
+    try {
+      usedBy = await countRecipesUsingFood(food.id);
+    } catch {
+      // If the check fails, still warn -- just without a count.
+      usedBy = -1;
     }
+
+    const warning =
+      usedBy > 0
+        ? `${food.name} is used in ${usedBy} recipe${usedBy === 1 ? "" : "s"}. Deleting it removes it from ${
+            usedBy === 1 ? "that recipe" : "those recipes"
+          } too. This can't be undone.`
+        : usedBy === -1
+          ? `${food.name} will be permanently deleted, and removed from any recipe using it. This can't be undone.`
+          : `${food.name} will be permanently deleted. This can't be undone.`;
+
+    Alert.alert(`Delete ${food.name}?`, warning, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => deleteFood.mutate(food.id) },
+    ]);
   };
 
   return (
     <View className="flex-1 bg-cream-50 px-5 pt-2">
       <View className="mb-4">
         <SegmentControl
-          value={mode}
-          onChange={setMode}
+          value={status}
+          onChange={(v) => {
+            setStatus(v);
+            setSelectedFoodId(null);
+          }}
           options={[
-            { value: "current", label: "Current Foods" },
-            { value: "all", label: "All Foods" },
+            { value: "current", label: "Current" },
+            { value: "paused", label: "Paused" },
+            { value: "exception", label: "Exceptions" },
           ]}
         />
       </View>
@@ -148,7 +191,7 @@ export default function FoodsScreen() {
       <View className="flex-row items-end gap-3 pb-3">
         <TextField
           className="flex-1"
-          label="Add a food you're currently eating"
+          label={ADD_PLACEHOLDER[status]}
           value={name}
           onChangeText={setName}
           placeholder="e.g. Sweet potato"
@@ -175,19 +218,29 @@ export default function FoodsScreen() {
 
       <FlatList
         data={items}
-        keyExtractor={(item, i) => (item.type === "header" ? `h-${item.id}` : `f-${item.food.id}-${i}`)}
+        keyExtractor={(item, i) =>
+          item.type === "header" ? `h-${item.id}` : `f-${item.food.id}-${i}`
+        }
         contentContainerClassName="gap-2 pb-10"
         showsVerticalScrollIndicator={false}
         extraData={selectedFoodId}
         ListEmptyComponent={
           !isLoading ? (
             <EmptyState
-              emoji="🥕"
-              title={mode === "current" ? "Nothing here yet" : "No foods yet"}
+              emoji={status === "exception" ? "⚠️" : "🥕"}
+              title={
+                status === "current"
+                  ? "Nothing here yet"
+                  : status === "paused"
+                    ? "Nothing paused"
+                    : "No exceptions"
+              }
               subtitle={
-                mode === "current"
-                  ? "Add the foods you're currently eating and tolerating well — recipes made entirely from this list will show up under Current Diet."
-                  : "Foods you've moved out of Current Foods land here, so you can quickly bring them back later."
+                status === "current"
+                  ? "Add the foods you're currently eating and tolerating well — recipes made entirely from this list show up under Current Diet."
+                  : status === "paused"
+                    ? "Foods you usually tolerate but are taking a break from live here. Move one back to Current any time."
+                    : "Ingredients a recipe calls for that aren't part of your diet show up here."
               }
             />
           ) : null
@@ -196,17 +249,25 @@ export default function FoodsScreen() {
           item.type === "header" ? (
             <Pressable
               onPress={() => onHeaderPress(item.id)}
-              className={`flex-row items-center justify-between rounded-xl px-2 py-2 ${index === 0 ? "mt-0" : "mt-2"} ${
-                selectedFoodId ? "bg-sage-100" : ""
-              }`}
+              className={`flex-row items-center justify-between rounded-xl px-2 py-2 ${
+                index === 0 ? "mt-0" : "mt-2"
+              } ${selectedFoodId ? "bg-sage-100" : ""}`}
             >
               <Text
-                className={`text-sm font-bold uppercase tracking-wide ${selectedFoodId ? "text-sage-700" : "text-ink-400"}`}
+                className={`text-sm font-bold uppercase tracking-wide ${
+                  selectedFoodId ? "text-sage-700" : "text-ink-400"
+                }`}
               >
                 {item.name} · {item.count}
               </Text>
               <SymbolView
-                name={selectedFoodId ? "checkmark.circle" : item.collapsed ? "chevron.down" : "chevron.up"}
+                name={
+                  selectedFoodId
+                    ? "checkmark.circle"
+                    : item.collapsed
+                      ? "chevron.down"
+                      : "chevron.up"
+                }
                 fallback={null}
                 tintColor={selectedFoodId ? "#5A7A4B" : "#8A8477"}
                 size={14}
@@ -215,10 +276,17 @@ export default function FoodsScreen() {
           ) : (
             <Card
               className={`flex-row items-center justify-between border py-3 ${
-                item.food.id === selectedFoodId ? "border-terracotta-400 bg-terracotta-50" : "border-transparent"
+                item.food.id === selectedFoodId
+                  ? "border-terracotta-400 bg-terracotta-50"
+                  : "border-transparent"
               }`}
             >
-              <Pressable className="flex-1" onPress={() => onFoodPress(item.food)}>
+              <Pressable
+                className="flex-1"
+                onPress={() =>
+                  setSelectedFoodId((prev) => (prev === item.food.id ? null : item.food.id))
+                }
+              >
                 <Text className="text-base font-medium text-ink-800">{item.food.name}</Text>
                 <Text className="mt-0.5 text-xs text-ink-400">
                   {item.food.categories[0]?.name ?? "Uncategorized"}
@@ -226,7 +294,7 @@ export default function FoodsScreen() {
               </Pressable>
               <View className="flex-row items-center gap-1">
                 <Pressable
-                  onPress={() => onMove(item.food)}
+                  onPress={() => onChangeStatus(item.food)}
                   hitSlop={10}
                   className="rounded-full p-1.5 active:bg-sage-100"
                 >
@@ -238,16 +306,11 @@ export default function FoodsScreen() {
                   />
                 </Pressable>
                 <Pressable
-                  onPress={() => onArchive(item.food)}
+                  onPress={() => onDelete(item.food)}
                   hitSlop={10}
                   className="rounded-full p-1.5 active:bg-ink-100"
                 >
-                  <SymbolView
-                    name="trash"
-                    fallback={null}
-                    tintColor="#BC5A2C"
-                    size={19}
-                  />
+                  <SymbolView name="trash" fallback={null} tintColor="#BC5A2C" size={19} />
                 </Pressable>
               </View>
             </Card>

@@ -135,7 +135,7 @@ export function RecipeForm({
         items={foods ?? []}
         value={ingredients}
         onChange={setIngredients}
-        onCreate={(n) => addFood.mutateAsync(n)}
+        onCreate={(n) => addFood.mutateAsync({ name: n })}
         placeholder="Search or add an ingredient"
       />
 

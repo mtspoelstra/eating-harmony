@@ -73,12 +73,15 @@ Use index-based conditionals in `renderItem` instead (see the date headers in
 All tables are per-user with RLS scoped to `auth.uid()`. Full schema (safe to
 re-run) lives in `supabase/schema.sql`.
 
-- `foods` — the user's ingredients. Three states via two booleans:
-  - `is_current` → shows under **Current Foods**
-  - `is_all_foods` → shows under **All Foods** (moved out of current, kept for
-    quick re-adding)
-  - both false → archived, hidden from both, but the row survives so recipes
-    referencing it don't break
+- `foods` — the user's ingredients. One `status` column, three values:
+  - `current` → tolerated right now. Green dot on recipes.
+  - `paused` → usually fine, not right now. Grey dot.
+  - `exception` → not part of the diet; exists only because a recipe calls
+    for it. Red dot.
+  My Foods has one tab per status. Changing status never deletes anything.
+  Deleting a food is a real, permanent delete that cascades to
+  `recipe_ingredients`, so the UI warns with a count of affected recipes
+  first. There is no hidden/archived state.
 - `food_categories` — Protein / Veggie / Fruit / Carb / Herbs and Spices are
   seeded per-user by an `auth.users` insert trigger (plus a backfill for
   existing users). Users can add and delete their own.

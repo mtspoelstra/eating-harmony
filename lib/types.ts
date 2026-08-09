@@ -8,12 +8,13 @@ export type FoodCategory = {
   created_at: string;
 };
 
+export type FoodStatus = "current" | "paused" | "exception";
+
 export type Food = {
   id: string;
   user_id: string;
   name: string;
-  is_current: boolean;
-  is_all_foods: boolean;
+  status: FoodStatus;
   created_at: string;
   categories: FoodCategory[];
 };

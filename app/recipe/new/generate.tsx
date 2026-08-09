@@ -43,7 +43,7 @@ const CUISINES = [
 export default function GenerateRecipeScreen() {
   const router = useRouter();
   const { data: foods } = useFoodsQuery();
-  const currentFoods = (foods ?? []).filter((f) => f.is_current);
+  const currentFoods = (foods ?? []).filter((f) => f.status === "current");
 
   const generateRecipe = useGenerateRecipeMutation();
   const findOrCreateTag = useFindOrCreateTagMutation();
